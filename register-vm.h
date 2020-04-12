@@ -59,34 +59,19 @@ two_reg_imm parse_two_reg(u64 instr) {
 }
 
 
+void halt(i32 code) {
 
-void RegisterVM::fetch() {
-    ir = memory[pc++];
 }
-void RegisterVM::decode() {
-    opcode = getOp(memory[pc]);
-    instrData = getData(memory[pc]);
+void fetch() {
+    ir = memory[pc/page_size_bytes][pc % page_size_bytes];
 }
-
-i16 RegisterVM::getOp() {
+u16 getOp() {
     return ir >> opcode_offset;
 }
-void RegisterVM::execute() {
-    if(opcode > 0 && opcode <= 10) {
-        abInstr();
-    }
-    else if(opcode >= 100 && opcode <= 104) {
-        brInstr();
-    }
-    else if(opcode >= 200 && opcode <= 205) {
-        memInstr();
-    }
-    else if(opcode == 0) {
-        halt(0);
-    }
-
+void decode() {
+    opcode = getOp();
 }
-void RegisterVM::abInstr() {
+void ab_instr() {
     const auto regs = parse_three_reg(ir);
     const auto reg_imm = parse_two_reg(ir);
     switch(opcode) {
@@ -122,7 +107,7 @@ void RegisterVM::abInstr() {
             break;
     }
 }
-void RegisterVM::brInstr() {
+void br_instr() {
     constexpr auto offset = 100;
     const auto reg_imm = parse_two_reg(ir);
     auto address = (instrData & 0xffffffff);
@@ -145,12 +130,12 @@ void RegisterVM::brInstr() {
             break;
     }
 }
-void RegisterVM::mem_instr() {
+void mem_instr() {
     constexpr auto offset = 200;
     const auto reg_imm = parse_two_reg(ir);
-    const auto address = reg_imm.offset+reg_imm.r1;
+    const auto address = reg_imm.imm+reg_imm.r1;
     auto & page = memory[address/page_size_bytes];
-    const auto inPage = address%page_size_bytes;
+    const auto in_page = address%page_size_bytes;
 
     if(opcode >= offset and opcode <= offset+5) {
         bool is_load = opcode % 2 == 0;
@@ -169,14 +154,30 @@ void RegisterVM::mem_instr() {
         }
     }
 }
-void RegisterVM::run() {
+
+void execute() {
+    if(opcode > 0 && opcode <= 10) {
+        ab_instr();
+    }
+    else if(opcode >= 100 && opcode <= 104) {
+        br_instr();
+    }
+    else if(opcode >= 200 && opcode <= 205) {
+        mem_instr();
+    }
+    else if(opcode == 0) {
+        halt(0);
+    }
+
+}
+void run() {
     while(running) {
         fetch();
         decode();
         execute();
     }
 }
-void RegisterVM::loadProgram(const std::vector<i64>& prog) {
+void loadProgram(const std::vector<u64>& prog) {
     auto k = 0;
     for(auto i = 0; i < prog.size(); i++) {
         auto index = (pc + i);
