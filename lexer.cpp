@@ -7,6 +7,13 @@
 lexer::lexer(const std::string& _file_name) : file_name{_file_name} {
     std::string line;
     std::ifstream input_file{_file_name.c_str()};
+    try {
+      if(!input_file) {
+        throw "File does not exist in this directory";
+      }
+    } catch(const char* e) {
+      std::cout << e << std::endl;
+    }
     std::stringstream ss;
     while(getline(input_file, line)) {
       ss << line << std::endl;
