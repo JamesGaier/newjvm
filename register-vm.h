@@ -17,14 +17,20 @@ std::array<u64, NUM_REGS> registers;
 std::vector<u64> prog;
 std::map<u64, page> memory;
 
-
+/*
+* @param instr: 64 bit instruction
+* @purpose: To parse an instruction into a three_reg struct
+*/
 three_reg parse_three_reg(u64 instr) {
     u8 r0 = (instr >> r0_offset) & register_mask;
     u8 r1 = (instr >> r1_offset) & register_mask;
     u8 r2 = (instr >> r2_offset) & register_mask;
     return {r0, r1, r2};
 }
-
+/*
+* @param instr: 64 bit instruction
+* @purpose: To parse an instruction into a two_reg struct
+*/
 two_reg_imm parse_two_reg(u64 instr) {
     u8 r0 = (instr >> r0_offset) & register_mask;
     u8 r1 = (instr >> r1_offset) & register_mask;
@@ -37,23 +43,38 @@ two_reg_imm parse_two_reg(u64 instr) {
 void halt(i32 code) {
 
 }
+/*
+* @purpose: To fetch an instruction from memory and load it
+* into the instruction register
+*/
 void fetch() {
     ir = 0;
     u64 temp = 0;
-    for(auto i = 0; i < BYTE; i++) {
+    for(u8 i = 0; i < BYTE; i++) {
         temp = static_cast<u64>(memory[pc/page_size_bytes][(pc % page_size_bytes) + i]) << 8*i;
         ir += temp;
     }
+    /*
     if(pc < 32) {
-        std::cout << std::hex << ir << " " << pc << std::endl;
+        std::cout << std::hex << ir << std::endl;
     }
+    */
 }
+/*
+* @purpose: To get the opcode from instructions.
+*/
 u16 getOp() {
     return ir >> opcode_offset;
 }
+/*
+* @purpose: To get the opcode.
+*/
 void decode() {
     opcode = getOp();
 }
+/*
+* @purpose: To do arithemetic and bitwise instructions
+*/
 void ab_instr() {
     const auto regs = parse_three_reg(ir);
     const auto reg_imm = parse_two_reg(ir);
@@ -65,7 +86,6 @@ void ab_instr() {
             break;
         case 2:
             registers[regs.r0] = registers[regs.r1] - registers[regs.r2];
-            std::cout << registers[regs.r0] << std::endl;
             break;
         case 3:
             registers[regs.r0] = registers[regs.r1] | registers[regs.r2];
@@ -93,6 +113,9 @@ void ab_instr() {
             break;
     }
 }
+/*
+* @purpose: To do branch instructions
+*/
 void br_instr() {
     constexpr auto offset = 100;
     const auto reg_imm = parse_two_reg(ir);
@@ -116,32 +139,38 @@ void br_instr() {
             break;
     }
 }
+/*
+* @purpose: To do memory instructions
+*/
 void mem_instr() {
     auto offset = 200;
     const auto reg_imm = parse_two_reg(ir);
     const auto address = reg_imm.imm+reg_imm.r1;
-    auto & cur_page = memory[address/page_size_bytes][address % page_size_bytes];
-    const auto in_page = address%page_size_bytes;
-
-    if(opcode >= offset and opcode <= offset+5) {
-        bool is_load = opcode % 2 == 0;
+    if(opcode >= offset && opcode <= offset+5) {
+        bool is_load = opcode % 2 != 0;
         auto len = (1 << ((opcode - 200) + 2) / 2);
 
         if(is_load) {
             for(u8 pos = 0; pos < len; pos++){
-                //std::cout << cur_page << std::endl;
-                //page[cur_page + pos] = (registers[reg_imm.r0] >> (8 * pos)) & 0xff; I do not know why but this does not work
+                memory[address/page_size_bytes][address % page_size_bytes + pos] =
+                    (registers[reg_imm.r0] >> (8 * pos)) & 0xff;
+                //std::cout << std::hex <<
+                   // (unsigned)memory[address/page_size_bytes][address % page_size_bytes + pos]
+                  //  << std::endl;
             }
         }
         else {
             registers[reg_imm.r0] = 0;
             for(u8 pos = 0; pos < len; pos++){
-                //registers[reg_imm.r0] = static_cast<u64>(page[cur_page + pos]) << (8 * pos); neither does this
+                registers[reg_imm.r0] += static_cast<u64>(memory[address/page_size_bytes][address % page_size_bytes + pos]) << (8 * pos);
+                //std::cout << std::hex << registers[reg_imm.r0] << std::endl;
             }
         }
     }
 }
-
+/*
+* @purpose: To execute instructions based on the opcode
+*/
 void execute() {
     //std::cout << opcode << std::endl;
     if(opcode > 0 && opcode <= 10) {
@@ -158,6 +187,9 @@ void execute() {
         halt(0);
     }
 }
+/*
+* @purpose: Simulates a cpu
+*/
 void run() {
     while(running) {
         fetch();
@@ -166,6 +198,9 @@ void run() {
         pc += 8;
     }
 }
+/*
+* @purpose: Reads the source file and parses out the 64 bit instructions
+*/
 std::vector<std::string> read_source(const std::string& file_name) {
     std::ifstream input_file{file_name};
 
@@ -198,6 +233,9 @@ std::vector<std::string> read_source(const std::string& file_name) {
     }
     return prog;
 }
+/*
+* @purpose: loads instructions into the text segment of memory
+*/
 void load_program(const std::string& file_name) {
     auto prog = read_source(file_name);
     auto k = 0;

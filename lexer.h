@@ -23,7 +23,7 @@ private:
         {"sli", 8}, {"sri", 9}, {"sub", 2}, {"slt", 10},
         {"jmp", 100}, {"jal", 101}, {"jeq", 102}, {"jne", 103},
         {"jr", 104}, {"lw", 200}, {"sw", 201}, {"ldw", 202},
-        {"sdw", 104}, {"lqw", 200}, {"sqw", 201}
+        {"sdw", 203}, {"lqw", 204}, {"sqw", 205}
     }};
     std::map<std::string, i64> label_line;
     std::string source = "";
