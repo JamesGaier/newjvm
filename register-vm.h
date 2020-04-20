@@ -22,7 +22,6 @@ three_reg parse_three_reg(u64 instr) {
     u8 r0 = (instr >> r0_offset) & register_mask;
     u8 r1 = (instr >> r1_offset) & register_mask;
     u8 r2 = (instr >> r2_offset) & register_mask;
-
     return {r0, r1, r2};
 }
 
@@ -40,15 +39,14 @@ void halt(i32 code) {
 }
 void fetch() {
     ir = 0;
-    /*
-    unfinished
-    */
+    u64 temp = 0;
     for(auto i = 0; i < BYTE; i++) {
-        ir = (ir + memory[pc/page_size_bytes][(pc % page_size_bytes) + i]) << i*4;
-        //std::cout << std::hex << (unsigned)memory[pc/page_size_bytes][(pc % page_size_bytes) + i] << std::endl;
+        temp = static_cast<u64>(memory[pc/page_size_bytes][(pc % page_size_bytes) + i]) << 8*i;
+        ir += temp;
     }
-    std::cout << std::hex << ir << std::endl;
-    std::cout << std::endl;
+    if(pc < 32) {
+        std::cout << std::hex << ir << " " << pc << std::endl;
+    }
 }
 u16 getOp() {
     return ir >> opcode_offset;
@@ -67,6 +65,7 @@ void ab_instr() {
             break;
         case 2:
             registers[regs.r0] = registers[regs.r1] - registers[regs.r2];
+            std::cout << registers[regs.r0] << std::endl;
             break;
         case 3:
             registers[regs.r0] = registers[regs.r1] | registers[regs.r2];
@@ -158,13 +157,13 @@ void execute() {
         //hault on the last nibble of the program
         halt(0);
     }
-
 }
 void run() {
     while(running) {
         fetch();
         decode();
         execute();
+        pc += 8;
     }
 }
 std::vector<std::string> read_source(const std::string& file_name) {
@@ -188,15 +187,15 @@ std::vector<std::string> read_source(const std::string& file_name) {
     auto program = ss.str();
     std::stringstream cur_instr;
     std::vector<std::string> prog;
-    for(auto i = 0; i < program.length(); i++) {
+    cur_instr << program[0];
+    for(auto i = 1; i < program.length()+1; i++) {
         auto ch = program[i];
-        if(i % 16 == 0 && i != 0)  {
+        if(i % 16 == 0)  {
             prog.push_back(cur_instr.str());
             cur_instr.str("");
         }
         cur_instr << ch;
     }
-
     return prog;
 }
 void load_program(const std::string& file_name) {
@@ -205,18 +204,21 @@ void load_program(const std::string& file_name) {
     auto index = pc;
     memory.emplace(0, page());
     for(auto i = 0; i < prog.size(); i++) {
-        if(pc + i > 511) { // change to constexpr value
+        if(pc + i > 511) {
             index %= 511;
             memory.emplace(k, page());
             k++;
         }
         auto cur_instr = prog[i];
+        //std::cout << cur_instr << std::endl;
         for(auto j = (BYTE*2)-1; j >= 1; j-=2) {
             std::stringstream ss;
             ss << cur_instr[j-1];
             ss << cur_instr[j];
             memory[k][index] = static_cast<u8>(std::stoi(ss.str().c_str(), nullptr, 16));
-            std::cout << k << " " << std::hex << (unsigned)memory[k][index] << std::endl;
+            //std::cout << std::hex << " " << k << " " << index <<  " " << static_cast<u64>(memory[k][index]) << std::endl;
+            //std::cout << index << std::endl;
+            //std::cout << k << " " << std::hex << (unsigned)memory[k][index] << std::endl;
             index++;
         }
     }
