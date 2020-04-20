@@ -7,6 +7,9 @@ int main(int argc, char* argv[]) {
             lex.lex_source();
 
             lex.gen_code();
+
+            load_program(lex.get_output_name());
+            run();
         }
         else {
             throw "please run the executable in the following format: run command file_name.vm";

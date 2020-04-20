@@ -28,6 +28,7 @@ private:
     std::map<std::string, i64> label_line;
     std::string source = "";
     std::string file_name = "";
+    std::string output_name = "";
     commands cmds;
     u64 idx = 0;
     u64 line_number = 1;
@@ -41,9 +42,9 @@ private:
     std::string pad_instruction(const u64 instruction);
     u64 get_mem(const u64 op_sec,const std::vector<std::string>& command);
 public:
-    std::string to_bin(const i64 num, const i32 size, bool pad_back);
     lexer(const std::string& file_name);
     void lex_source();
     void gen_code();
+    std::string get_output_name();
 };
 #endif

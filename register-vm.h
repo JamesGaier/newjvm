@@ -2,6 +2,7 @@
 #define REGISTERVM_H_
 #include<map>
 #include<array>
+#include <string>
 #include"vm-utils.h"
 
 
@@ -14,8 +15,7 @@ u32 instrData = 0;
 bool running = true;
 std::array<u64, NUM_REGS> registers;
 std::vector<u64> prog;
-// change to map<u64, page> memory;
-std::vector<page> memory;
+std::map<u64, page> memory;
 
 
 three_reg parse_three_reg(u64 instr) {
@@ -39,7 +39,16 @@ void halt(i32 code) {
 
 }
 void fetch() {
-    ir = memory[pc/page_size_bytes][pc % page_size_bytes];
+    ir = 0;
+    /*
+    unfinished
+    */
+    for(auto i = 0; i < BYTE; i++) {
+        ir = (ir + memory[pc/page_size_bytes][(pc % page_size_bytes) + i]) << i*4;
+        //std::cout << std::hex << (unsigned)memory[pc/page_size_bytes][(pc % page_size_bytes) + i] << std::endl;
+    }
+    std::cout << std::hex << ir << std::endl;
+    std::cout << std::endl;
 }
 u16 getOp() {
     return ir >> opcode_offset;
@@ -51,6 +60,8 @@ void ab_instr() {
     const auto regs = parse_three_reg(ir);
     const auto reg_imm = parse_two_reg(ir);
     switch(opcode) {
+        case 0:
+            running = false;
         case 1:
             registers[regs.r0] = registers[regs.r1] + registers[regs.r2];
             break;
@@ -107,10 +118,10 @@ void br_instr() {
     }
 }
 void mem_instr() {
-    constexpr auto offset = 200;
+    auto offset = 200;
     const auto reg_imm = parse_two_reg(ir);
     const auto address = reg_imm.imm+reg_imm.r1;
-    auto & page = memory[address/page_size_bytes];
+    auto & cur_page = memory[address/page_size_bytes][address % page_size_bytes];
     const auto in_page = address%page_size_bytes;
 
     if(opcode >= offset and opcode <= offset+5) {
@@ -119,19 +130,21 @@ void mem_instr() {
 
         if(is_load) {
             for(u8 pos = 0; pos < len; pos++){
-                page[in_page + pos] = (registers[reg_imm.r0] >> (8 * pos)) & 0xff;
+                //std::cout << cur_page << std::endl;
+                //page[cur_page + pos] = (registers[reg_imm.r0] >> (8 * pos)) & 0xff; I do not know why but this does not work
             }
         }
         else {
             registers[reg_imm.r0] = 0;
             for(u8 pos = 0; pos < len; pos++){
-                registers[reg_imm.r0] = static_cast<u64>(page[in_page + pos]) << (8 * pos);
+                //registers[reg_imm.r0] = static_cast<u64>(page[cur_page + pos]) << (8 * pos); neither does this
             }
         }
     }
 }
 
 void execute() {
+    //std::cout << opcode << std::endl;
     if(opcode > 0 && opcode <= 10) {
         ab_instr();
     }
@@ -142,6 +155,7 @@ void execute() {
         mem_instr();
     }
     else if(opcode == 0) {
+        //hault on the last nibble of the program
         halt(0);
     }
 
@@ -153,16 +167,58 @@ void run() {
         execute();
     }
 }
-void loadProgram(const std::vector<u64>& prog) {
-    auto k = 0;
-    for(auto i = 0; i < prog.size(); i++) {
-        auto index = (pc + i);
-        if(pc + i > 64) { // change to constexpr value
-            index %= 64;
-            k++;
-            memory.push_back(page());
+std::vector<std::string> read_source(const std::string& file_name) {
+    std::ifstream input_file{file_name};
+
+    try{
+        if(!input_file) {
+            throw "File not found.";
         }
-        memory[k][index] = prog[i];
+    }
+    catch(const char* e) {
+        std::cout << e << std::endl;
+    }
+
+    std::stringstream ss;
+    std::string line;
+    while(getline(input_file, line)) {
+        ss << line;
+    }
+
+    auto program = ss.str();
+    std::stringstream cur_instr;
+    std::vector<std::string> prog;
+    for(auto i = 0; i < program.length(); i++) {
+        auto ch = program[i];
+        if(i % 16 == 0 && i != 0)  {
+            prog.push_back(cur_instr.str());
+            cur_instr.str("");
+        }
+        cur_instr << ch;
+    }
+
+    return prog;
+}
+void load_program(const std::string& file_name) {
+    auto prog = read_source(file_name);
+    auto k = 0;
+    auto index = pc;
+    memory.emplace(0, page());
+    for(auto i = 0; i < prog.size(); i++) {
+        if(pc + i > 511) { // change to constexpr value
+            index %= 511;
+            memory.emplace(k, page());
+            k++;
+        }
+        auto cur_instr = prog[i];
+        for(auto j = (BYTE*2)-1; j >= 1; j-=2) {
+            std::stringstream ss;
+            ss << cur_instr[j-1];
+            ss << cur_instr[j];
+            memory[k][index] = static_cast<u8>(std::stoi(ss.str().c_str(), nullptr, 16));
+            std::cout << k << " " << std::hex << (unsigned)memory[k][index] << std::endl;
+            index++;
+        }
     }
 }
 

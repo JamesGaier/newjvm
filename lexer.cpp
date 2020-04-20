@@ -194,7 +194,8 @@ std::string lexer::pad_instruction(const u64 instruction) {
 */
 void lexer::gen_code() {
   auto name = file_name.substr(0,file_name.find(".vm"));
-  std::ofstream output_file{name+".bin", std::ios::binary};
+  output_name = name+".bin";
+  std::ofstream output_file{output_name, std::ios::binary};
   for(const auto& command: cmds) {
     if(op.find(command[0]) != op.end()) {
       u64 op_sec = op[command[0]] << opcode_offset;
@@ -235,4 +236,7 @@ void lexer::gen_code() {
     }
   }
   output_file.close();
+}
+std::string lexer::get_output_name() {
+  return output_name;
 }
