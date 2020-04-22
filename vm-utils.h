@@ -12,7 +12,8 @@ using u16 = uint16_t;
 using i8 = int8_t;
 using u8 = uint8_t;
 
-constexpr auto page_size_bytes = 512;
+constexpr auto page_size_bytes = 4096;
+constexpr auto pc_start = 0x80000000;
 using page = std::array<u8, page_size_bytes>;
 constexpr auto opcode_offset = 54;
 constexpr auto data_mask = 0x3fffffffffffff;

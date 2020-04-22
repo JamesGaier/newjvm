@@ -1,22 +1,27 @@
 #include"lexer.h"
+#include<iomanip>
+#include<stack>
+#include<cmath>
+#include<iostream>
+#include<fstream>
+#include<sstream>
+#include<algorithm>
 /*
 * @param _file_name: file path
 * @purpose: the constructor's purpose is to load the assembly into the source string
 *
 */
-lexer::lexer(const std::string& _file_name) : file_name{_file_name} {
-    std::string line;
-    std::ifstream input_file{_file_name.c_str()};
-    try {
-      if(!input_file) {
-        throw "File does not exist in this directory";
-      }
-    } catch(const char* e) {
-      std::cout << e << std::endl;
+lexer::lexer(const std::string& file_name_) : file_name{file_name_} {
+    std::ifstream input_file{file_name_};
+    if(!input_file) {
+      std::cout << "Cannot open file: " << file_name_ << std::endl;
+      return;
     }
     std::stringstream ss;
+    std::string line;
     while(getline(input_file, line)) {
-      ss << line << std::endl;
+      ss << line << '\n';
+      //std::cout << line << std::endl;
     }
     source = ss.str();
 }
@@ -45,6 +50,9 @@ void lexer::advance() {
 *
 */
 char lexer::peek() {
+  if(!isalpha(source[idx])) {
+    return source[idx];
+  }
   return tolower(source[idx]);
 }
 /*
@@ -52,10 +60,8 @@ char lexer::peek() {
 *
 */
 void lexer::ignore() {
-    if(peek() == ' ' || peek() == ',' || peek() == '\t') {
-    while(peek() == ' ' || peek() == ',' || peek() == '\t') {
-      advance();
-    }
+  while(peek() == ' ' || peek() == ',' || peek() == '\t') {
+    advance();
   }
 }
 /*
@@ -65,9 +71,9 @@ void lexer::ignore() {
 void lexer::lex_line() {
   std::vector<std::string> command;
   ignore();
+  bool is_label = false;
   if(isalpha(peek())) {
     auto start = idx;
-    bool is_label = false;
     while(isalpha(peek()) || peek() == ':') {
       if(peek() == ':') is_label = true;
       advance();
@@ -79,7 +85,10 @@ void lexer::lex_line() {
     command.push_back(val);
   }
   else {
-    throw "expression must start with a letter\n\r";
+    throw "expression must start with a letter\n";
+  }
+  if(is_label) {
+    return;
   }
   ignore();
   if(isdigit(peek())) {
@@ -110,7 +119,11 @@ void lexer::lex_line() {
     auto start = idx;
     while(isdigit(peek()) || peek() == '#' || isalpha(peek())) {
       advance();
+      //std::cout << "advancing peeking " << peek() << std::endl;
+
     }
+    //std::cout << peek() << std::endl;
+    //std::cout << start << " " << idx-start << std::endl;
     command.push_back(source.substr(start, idx-start));
   }
   if(!isalpha(peek()) && idx < source.length()){
@@ -145,6 +158,7 @@ u64 lexer::get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& comm
   u64 r1 = strtoull(command[2].c_str(), nullptr, 10) << r1_offset;
   u64 r2 = label_line[command[3]] << imm_offset;
   if(command[3][0] == '#') {
+    //TODO: hexadecimal check
     r2 = strtoull(command[3].substr(1,command[3].length()-1).c_str(), nullptr, 10) << imm_offset;
     //std::cout << r2 << std::endl;
   }
@@ -203,10 +217,6 @@ void lexer::gen_code() {
         || command[0] == "sl" || command[0] == "sr" || command[0] == "slt") {
           output_file << pad_instruction(get_three_reg(op_sec, command));
       }
-      else if(command[0] == "ori" || command[0] == "sli" || command[0] == "sri"
-              || command[0] == "addi") {
-        output_file <<  pad_instruction(get_two_reg_imm(op_sec, command));
-      }
       else if(command[0] == "lw" || command[0] == "sw" || command[0] == "ldw"
              || command[0] == "sdw" || command[0] == "lqw" || command[0] == "sqw") {
         output_file << pad_instruction(get_mem(op_sec, command));
@@ -235,7 +245,6 @@ void lexer::gen_code() {
       }
     }
   }
-  output_file.close();
 }
 std::string lexer::get_output_name() {
   return output_name;
