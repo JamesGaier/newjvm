@@ -128,7 +128,7 @@ namespace vm {
                 pc = address << 3;
                 break;
             case offset+1:
-                ra = pc + 8;
+                ra = pc;
                 pc = address << 3;
                 break;
             case offset+2:
@@ -144,6 +144,7 @@ namespace vm {
     }
     /*
     * @purpose: To do memory instructions
+    *  use .at() for lw and sw memory accesses
     */
     void mem_instr() {
         auto offset = 200;
@@ -152,21 +153,21 @@ namespace vm {
         if(opcode >= offset && opcode <= offset+5) {
             bool is_load = opcode % 2 == 0;
             auto len = (1 << ((opcode - 200) + 2) / 2);
-            //std::cout << len << std::endl;
+            std::cout << len << std::endl;
             if(!is_load) {
                 for(u8 pos = 0; pos < len; pos++){
                     memory[address/page_size_bytes][address % page_size_bytes + pos] =
                         (registers[reg_imm.r0] >> (8 * pos)) & 0xff;
-                    //std::cout << std::hex <<
-                    //(unsigned)memory[address/page_size_bytes][address % page_size_bytes + pos]
-                    //<< std::endl;
+                    std::cout << std::hex << "sw" <<
+                    (unsigned)memory[address/page_size_bytes][address % page_size_bytes + pos]
+                    << std::endl;
                 }
             }
             else {
                 registers[reg_imm.r0] = 0;
                 for(u8 pos = 0; pos < len; pos++){
                     registers[reg_imm.r0] += static_cast<u64>(memory[address/page_size_bytes][address % page_size_bytes + pos]) << (8 * pos);
-                    //std::cout << std::hex << registers[reg_imm.r0] << std::endl;
+                    std::cout << std::hex << "lw" << registers[reg_imm.r0] << std::endl;
                 }
             }
         }
@@ -226,6 +227,7 @@ namespace vm {
         return prog;
     }
     void run() {
+        // test pc += 8 after fetch
         while(running) {
             fetch();
             decode();

@@ -70,10 +70,13 @@ void lexer::ignore() {
 */
 void lexer::lex_line() {
   std::vector<std::string> command;
+  // ignore any initial whitespace
   ignore();
   bool is_label = false;
+  // get the instruction
   if(isalpha(peek())) {
     auto start = idx;
+    // checks if label
     while(isalpha(peek()) || peek() == ':') {
       if(peek() == ':') is_label = true;
       advance();
@@ -82,15 +85,19 @@ void lexer::lex_line() {
     if(is_label) {
       label_line.emplace(val.substr(0,val.length()-1), line_number);
     }
+    // push back command or label
     command.push_back(val);
   }
   else {
-    throw "expression must start with a letter\n";
+    std::cout << "expression must start with a letter\n";
   }
   if(is_label) {
+    // no need to continue lexing if there is a label
     return;
   }
+  // ignore more whitespace
   ignore();
+  // check for first argument
   if(isdigit(peek())) {
     auto start = idx;
     while(isdigit(peek())) {
@@ -98,22 +105,30 @@ void lexer::lex_line() {
     }
     command.push_back(source.substr(start, idx-start));
   }
+  // ignore whitespace
   ignore();
   if(isdigit(peek())) {
     auto start = idx;
-    while(isdigit(peek()) || tolower(peek()) == 'x') {
-      advance();
-    }
-    command.push_back(source.substr(start, idx-start));
-    if(peek() == '[') {
-      advance();
-      start = idx;
-      while(isdigit(peek())) {
+    // if offset is hex or is a number
+    if(isdigit(peek()) || tolower(peek()) == 'x') {
+      while(isdigit(peek()) || tolower(peek()) == 'x') {
         advance();
       }
       command.push_back(source.substr(start, idx-start));
     }
   }
+  // if it is a memory read/write
+  if(peek() == '[') {
+    advance();
+    auto start = idx;
+    while(isdigit(peek())) {
+      advance();
+    }
+    //std::cout << idx-start << std::endl;
+    command.push_back(source.substr(start, idx-start));
+    advance();
+  }
+    //std::cout <<  command[0] << " " << command[2] << std::endl;
   ignore();
   if(isdigit(peek()) || peek() == '#' || isalpha(peek())) {
     auto start = idx;
@@ -182,11 +197,27 @@ u64 lexer::get_three_reg(const u64 op_sec,const std::vector<std::string>& comman
 */
 u64 lexer::get_mem(const u64 op_sec, const std::vector<std::string>& command) {
   u64 r0 = strtoull(command[1].c_str(), nullptr, 10) << r0_offset;
-  u64 r1 = strtoull(command[3].c_str(), nullptr, 10) << r1_offset;
-  std::stringstream off_str;
-  auto base = (command[2].substr(0,2) == "0x") ? 16:10;
-  off_str << std::dec << strtoull(command[2].c_str(), nullptr, base);
+  u64 r1 = strtoull(command[(command.size() == 4) ? 3:2].c_str(), nullptr, 10) << r1_offset;
+  std::cout << command.size() << std::endl;
+  // if command 2 is not empty set offset, otherwise return empty
+  auto off_str = [&command](const std::string& off) {
+    auto is_num = true;
+    for(const auto& ch: command[2]) {
+      std::cout << ch << std::endl;
+      if(!isdigit(ch)) {
+        is_num = false;
+      }
+    }
+    std::stringstream to_ret;
+    if(is_num) {
+      auto base = (command[2].substr(0,2) == "0x") ? 16:10;
+      to_ret << std::dec << strtoull(command[2].c_str(), nullptr, base);
+    }
+    return to_ret;
+
+  }(command[2]);
   u64 offset = strtoull(off_str.str().c_str(), nullptr, 10) << imm_offset;
+  std::cout << "pass2" << std::endl;
   return op_sec + r0 + r1 + offset;
 }
 /*
