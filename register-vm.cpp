@@ -153,7 +153,7 @@ namespace vm {
         if(opcode >= offset && opcode <= offset+5) {
             bool is_load = opcode % 2 == 0;
             auto len = (1 << ((opcode - 200) + 2) / 2);
-            std::cout << len << std::endl;
+            //std::cout << len << std::endl;
             if(!is_load) {
                 for(u8 pos = 0; pos < len; pos++){
                     memory[address/page_size_bytes][address % page_size_bytes + pos] =

@@ -132,6 +132,10 @@ void lexer::lex_line() {
   ignore();
   if(isdigit(peek()) || peek() == '#' || isalpha(peek())) {
     auto start = idx;
+    advance();
+    if(peek() == '-') {
+      advance();
+    }
     while(isdigit(peek()) || peek() == '#' || isalpha(peek())) {
       advance();
       //std::cout << "advancing peeking " << peek() << std::endl;
@@ -174,8 +178,10 @@ u64 lexer::get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& comm
   u64 r2 = label_line[command[3]] << imm_offset;
   if(command[3][0] == '#') {
     //TODO: hexadecimal check
-    r2 = strtoull(command[3].substr(1,command[3].length()-1).c_str(), nullptr, 10) << imm_offset;
-    //std::cout << r2 << std::endl;
+    auto is_hex = command[3][1] == 'x';
+    i32 base = (is_hex) ? 16:10;
+    auto hex_off = (is_hex) ? 1:0;
+    r2 = strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base) << imm_offset;
   }
   return op_sec + r0 + r1 + r2;
 }
@@ -198,26 +204,14 @@ u64 lexer::get_three_reg(const u64 op_sec,const std::vector<std::string>& comman
 u64 lexer::get_mem(const u64 op_sec, const std::vector<std::string>& command) {
   u64 r0 = strtoull(command[1].c_str(), nullptr, 10) << r0_offset;
   u64 r1 = strtoull(command[(command.size() == 4) ? 3:2].c_str(), nullptr, 10) << r1_offset;
-  std::cout << command.size() << std::endl;
+  //std::cout << command.size() << std::endl;
   // if command 2 is not empty set offset, otherwise return empty
-  auto off_str = [&command](const std::string& off) {
-    auto is_num = true;
-    for(const auto& ch: command[2]) {
-      std::cout << ch << std::endl;
-      if(!isdigit(ch)) {
-        is_num = false;
-      }
-    }
-    std::stringstream to_ret;
-    if(is_num) {
-      auto base = (command[2].substr(0,2) == "0x") ? 16:10;
-      to_ret << std::dec << strtoull(command[2].c_str(), nullptr, base);
-    }
-    return to_ret;
-
-  }(command[2]);
+  std::stringstream off_str;
+  if(command.size() == 4) {
+    auto base = (command[2].substr(0,2) == "0x") ? 16:10;
+    off_str << std::dec << strtoull(command[2].c_str(), nullptr, base);
+  }
   u64 offset = strtoull(off_str.str().c_str(), nullptr, 10) << imm_offset;
-  std::cout << "pass2" << std::endl;
   return op_sec + r0 + r1 + offset;
 }
 /*
@@ -238,6 +232,7 @@ std::string lexer::pad_instruction(const u64 instruction) {
 * @purpose: generates the machine code for the virtual machine to interpret.
 */
 void lexer::gen_code() {
+  //std::cout << std::hex << -100 << std::endl;
   auto name = file_name.substr(0,file_name.find(".vm"));
   output_name = name+".bin";
   std::ofstream output_file{output_name, std::ios::binary};
