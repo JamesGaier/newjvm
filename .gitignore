@@ -1,1 +1,5 @@
 a.exe
+*.out
+*.o
+*.bin
+temp
