@@ -181,9 +181,9 @@ u64 lexer::get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& comm
     auto is_hex = command[3][1] == 'x';
     i32 base = (is_hex) ? 16:10;
     auto hex_off = (is_hex) ? 1:0;
-    r2 = strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base) << imm_offset;
+    r2 = static_cast<u32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
   }
-  return op_sec + r0 + r1 + r2;
+  return op_sec | r0 | r1 | r2;
 }
 /*
 * @param op_sec, command: opcode section is the opcode shifted to its correct position.
@@ -194,7 +194,7 @@ u64 lexer::get_three_reg(const u64 op_sec,const std::vector<std::string>& comman
   u64 r0 = strtoull(command[1].c_str(), nullptr, 10) << r0_offset;
   u64 r1 = strtoull(command[2].c_str(), nullptr, 10) << r1_offset;
   u64 r2 = strtoull(command[3].c_str(), nullptr, 10) << r2_offset;
-  return op_sec + r0 + r1 + r2;
+  return op_sec | r0 | r1 | r2;
 }
 /*
 * @param op_sec, command: opcode section is the opcode shifted to its correct position.

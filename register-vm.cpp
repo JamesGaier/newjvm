@@ -8,20 +8,25 @@
 #include<sstream>
 namespace vm {
 
-    u64 pc = pc_start; // to be determined
-    u64 sp = 0; // also to be determined;
+    u64 pc = pc_start;
     u64 ir = 0;
-    u64 ra = 0;
     u16 opcode = 0;
     u32 instrData = 0;
     bool running = true;
     std::array<u64, NUM_REGS> registers;
+
     std::vector<u64> prog;
     std::map<u64, page> memory;
     /*
     * @param instr: 64 bit instruction
     * @purpose: To parse an instruction into a three_reg struct
     */
+   void init_reg() {
+        registers[0]  = 0;
+        registers[61] = top_stack; // stack pointer
+        registers[62] = top_stack; // frame pointer
+        registers[63] = 0; // return address
+   }
     three_reg parse_three_reg(u64 instr) {
         u8 r0 = (instr >> r0_offset) & register_mask;
         u8 r1 = (instr >> r1_offset) & register_mask;
@@ -128,7 +133,7 @@ namespace vm {
                 pc = address << 3;
                 break;
             case offset+1:
-                ra = pc;
+                registers[63] = pc;
                 pc = address << 3;
                 break;
             case offset+2:
@@ -227,12 +232,13 @@ namespace vm {
         return prog;
     }
     void run() {
-        // test pc += 8 after fetch
+        init_reg();
         while(running) {
             fetch();
+            pc += 8;
             decode();
             execute();
-            pc += 8;
+
         }
     }
     void load_program(const std::string& file_name) {
