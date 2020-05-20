@@ -177,11 +177,20 @@ u64 lexer::get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& comm
   u64 r1 = strtoull(command[2].c_str(), nullptr, 10) << r1_offset;
   u64 r2 = label_line[command[3]] << imm_offset;
   if(command[3][0] == '#') {
-    //TODO: hexadecimal check
     auto is_hex = command[3][1] == 'x';
     i32 base = (is_hex) ? 16:10;
     auto hex_off = (is_hex) ? 1:0;
-    r2 = static_cast<u32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
+    std::cout << std::hex << r2 << std::endl;
+    if(command[0] == "addi") {
+      r2 = static_cast<i32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
+    }
+    else if(command[0] == "syscall") {
+
+    }
+    else {
+      r2 = static_cast<u32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
+
+    }
   }
   return op_sec | r0 | r1 | r2;
 }
@@ -218,7 +227,8 @@ u64 lexer::get_mem(const u64 op_sec, const std::vector<std::string>& command) {
 * @param instruction: the current instruction
 * @purpose: to pad the instruction with zeros if it is not 16 nibbles long
 */
-std::string lexer::pad_instruction(const u64 instruction) {
+/*
+tds::u64 lexer::pad_instruction(const u64 instruction) {
   std::stringstream ss;
   u64 pad_len = log(instruction)/log(16) + 1;
   if(pad_len == 16){
@@ -228,6 +238,7 @@ std::string lexer::pad_instruction(const u64 instruction) {
   ss << std::setw(16 - pad_len) << std::setfill('0') << 0 << std::hex << instruction;
   return ss.str();
 }
+*/
 /*
 * @purpose: generates the machine code for the virtual machine to interpret.
 */
@@ -235,42 +246,46 @@ void lexer::gen_code() {
   //std::cout << std::hex << -100 << std::endl;
   auto name = file_name.substr(0,file_name.find(".vm"));
   output_name = name+".bin";
-  std::ofstream output_file{output_name, std::ios::binary};
+  std::ofstream output_file{output_name, std::ios::binary | std::ios::out};
+  const auto write_u64 = [&output_file](u64 data) {
+    output_file.write((char*)&data, sizeof(data));
+  };
   for(const auto& command: cmds) {
     if(op.find(command[0]) != op.end()) {
       u64 op_sec = op[command[0]] << opcode_offset;
       if(command[0] == "add" || command[0] == "sub" || command[0] == "or"
         || command[0] == "sl" || command[0] == "sr" || command[0] == "slt") {
-          output_file << pad_instruction(get_three_reg(op_sec, command));
+          write_u64(get_three_reg(op_sec, command));
       }
       else if(command[0] == "lw" || command[0] == "sw" || command[0] == "ldw"
              || command[0] == "sdw" || command[0] == "lqw" || command[0] == "sqw") {
-        output_file << pad_instruction(get_mem(op_sec, command));
+        write_u64(get_mem(op_sec, command));
       }
       else if(command[0] == "jmp" || command[0] == "jal") {
         u64 addr = strtoull(command[1].substr(1,command[1].length()-1).c_str(), nullptr, 10);
         if(label_line.find(command[1].substr(0,command[1].length())) != label_line.end()) {
           addr = label_line[command[1].substr(0,command[1].length())];
         }
-        output_file << pad_instruction((op_sec + addr));
+        write_u64(op_sec | addr);
       }
       else if(command[0] == "jeq" || command[0] == "jne"
             || command[0] == "ori" || command[0] == "sli"
-            || command[0] == "sri") {
+            || command[0] == "sri" || command[0] == "addi") {
 
-        output_file << pad_instruction(get_two_reg_imm(op_sec, command));
+        write_u64(get_two_reg_imm(op_sec, command));
       }
       else if(command[0] == "halt" || command[0] == "jr") {
         u64 reg = strtoull(command[1].c_str(), nullptr, 10);
-        output_file << pad_instruction((op_sec + reg));
+        write_u64(op_sec | reg);
       }
       else if(command[0] == "lui") {
         u64 reg = strtoull(command[1].c_str(), nullptr, 10) << r0_offset;
         u64 imm = strtoull(command[2].substr(1,command[2].length() - 1).c_str(), nullptr, 10) << imm_offset;
-        output_file << pad_instruction((op_sec + reg + imm));
+        write_u64(op_sec | reg | imm);
       }
     }
   }
+  std::cout << "file written to" << std::endl;
 }
 std::string lexer::get_output_name() {
   return output_name;

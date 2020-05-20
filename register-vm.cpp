@@ -170,10 +170,12 @@ namespace vm {
             }
             else {
                 registers[reg_imm.r0] = 0;
+
                 for(u8 pos = 0; pos < len; pos++){
                     registers[reg_imm.r0] += static_cast<u64>(memory[address/page_size_bytes][address % page_size_bytes + pos]) << (8 * pos);
                     std::cout << std::hex << "lw" << registers[reg_imm.r0] << std::endl;
                 }
+                //std::cout << registers[reg_imm.r0] << std::endl;
             }
         }
     }
@@ -199,37 +201,23 @@ namespace vm {
     /*
     * @purpose: Reads the source file and parses out the 64 bit instructions
     */
-    std::vector<std::string> read_source(const std::string& file_name) {
-        std::ifstream input_file{file_name};
-
-        try{
-            if(!input_file) {
-                throw "File not found.";
-            }
-        }
-        catch(const char* e) {
-            std::cout << e << std::endl;
+    std::vector<u64> read_source(const std::string& file_name) {
+        std::ifstream input_file{file_name, std::ios::in | std::ios::binary};
+        input_file.seekg(0, std::ios::end);
+        auto file_size = static_cast<i32>(input_file.tellg());
+        input_file.seekg(0, std::ios::beg);
+        if(!input_file) {
+              std::cout << "File not found" << std::endl;
         }
 
-        std::stringstream ss;
-        std::string line;
-        while(getline(input_file, line)) {
-            ss << line;
+        std::vector<u64> byte_code;
+        u64 instr;
+        while(input_file.tellg() < file_size) {
+            input_file.read((char*)&instr, sizeof(instr));
+            byte_code.push_back(instr);
         }
-
-        auto program = ss.str();
-        std::stringstream cur_instr;
-        std::vector<std::string> prog;
-        cur_instr << program[0];
-        for(auto i = 1; i < program.length()+1; i++) {
-            auto ch = program[i];
-            if(i % 16 == 0)  {
-                prog.push_back(cur_instr.str());
-                cur_instr.str("");
-            }
-            cur_instr << ch;
-        }
-        return prog;
+        input_file.close();
+        return byte_code;
     }
     void run() {
         init_reg();
@@ -246,22 +234,23 @@ namespace vm {
         auto page_index = pc/page_size_bytes;
         auto index = pc % page_size_bytes;
         memory.emplace(0, page());
+        //std::cout << prog.size() << std::endl;
         for(auto i = 0; i < prog.size(); i++) {
-            if((pc + i) % page_size_bytes == 0 && i != 0) {
+            if((pc + i*QWORD) % page_size_bytes == 0 && i != 0) {
                 index %= page_size_bytes;
                 page_index++;
                 memory.emplace(page_index, page());
             }
             auto cur_instr = prog[i];
-            //std::cout << cur_instr << std::endl;
-            for(auto j = (BYTE*2)-1; j >= 1; j-=2) {
-                std::stringstream ss;
-                ss << cur_instr[j-1];
-                ss << cur_instr[j];
-                memory[page_index][index] = static_cast<u8>(std::stoi(ss.str().c_str(), nullptr, 16));
+            std::cout << QWORD/(BYTE/2) << std::endl;
+            for(auto j = 0; j < QWORD/(BYTE/2); j++) {
+                u8 cur = static_cast<u8>(cur_instr & 0xFF);
+                //std::cout << static_cast<u32>(cur) << std::endl;
+                memory[page_index][index] = cur;
                 //std::cout << std::hex << " " << k << " " << index <<  " " << static_cast<u64>(memory[k][index]) << std::endl;
                 //std::cout << index << std::endl;
                 //std::cout << k << " " << std::hex << (unsigned)memory[k][index] << std::endl;
+                cur_instr = cur_instr >> BYTE;
                 index++;
             }
         }
