@@ -24,9 +24,10 @@ constexpr auto r0_offset = 48;
 constexpr auto r1_offset = 42;
 constexpr auto r2_offset = 36;
 constexpr auto imm_offset = 10;
-constexpr auto imm_mask = 0xffffffff;
+constexpr u64 imm_mask = 0xffffffff;
 constexpr auto NUM_REGS = 64;
 constexpr auto BYTE = 8;
+constexpr auto QWORD = 64;
 
 struct three_reg {
     u8 r0, r1, r2;

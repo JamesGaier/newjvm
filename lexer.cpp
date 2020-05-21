@@ -180,19 +180,10 @@ u64 lexer::get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& comm
     auto is_hex = command[3][1] == 'x';
     i32 base = (is_hex) ? 16:10;
     auto hex_off = (is_hex) ? 1:0;
-    std::cout << std::hex << r2 << std::endl;
-    if(command[0] == "addi") {
-      r2 = static_cast<i32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
-    }
-    else if(command[0] == "syscall") {
-
-    }
-    else {
-      r2 = static_cast<u32>(strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base)) << imm_offset;
-
-    }
+    //std::cout << std::hex << r2 << std::endl;
+    r2 = strtoll(command[3].substr(1+hex_off,command[3].length()-1).c_str(), nullptr, base) << imm_offset;
   }
-  return op_sec | r0 | r1 | r2;
+  return op_sec | r0 | r1 | (r2 & imm_mask << imm_offset);
 }
 /*
 * @param op_sec, command: opcode section is the opcode shifted to its correct position.
@@ -270,8 +261,8 @@ void lexer::gen_code() {
       }
       else if(command[0] == "jeq" || command[0] == "jne"
             || command[0] == "ori" || command[0] == "sli"
-            || command[0] == "sri" || command[0] == "addi") {
-
+            || command[0] == "sri" || command[0] == "addi"
+            || command[0] == "syscall") {
         write_u64(get_two_reg_imm(op_sec, command));
       }
       else if(command[0] == "halt" || command[0] == "jr") {
@@ -285,7 +276,8 @@ void lexer::gen_code() {
       }
     }
   }
-  std::cout << "file written to" << std::endl;
+
+
 }
 std::string lexer::get_output_name() {
   return output_name;

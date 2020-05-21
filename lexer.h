@@ -15,10 +15,10 @@ public:
     std::string get_output_name();
 private:
     std::map<std::string, u64> op {{
-        {"halt", 0}, {"add", 1}, {"sub", 2}, {"or", 3},
+        {"syscall", 0}, {"add", 1}, {"sub", 2}, {"or", 3},
         {"ori", 4}, {"sl", 5}, {"sr", 6}, {"lui", 7},
-        {"sli", 8}, {"sri", 9}, {"sub", 2}, {"slt", 10},
-        {"jmp", 100}, {"jal", 101}, {"jeq", 102}, {"jne", 103},
+        {"sli", 8}, {"sri", 9}, {"slt", 10}, {"slti", 11},
+        {"addi", 12}, {"jmp", 100}, {"jal", 101}, {"jeq", 102}, {"jne", 103},
         {"jr", 104}, {"lw", 200}, {"sw", 201}, {"ldw", 202},
         {"sdw", 203}, {"lqw", 204}, {"sqw", 205}
     }};
