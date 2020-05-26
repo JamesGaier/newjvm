@@ -1,4 +1,5 @@
 #include"lexer.h"
+#include"vm-utils.h"
 #include<iomanip>
 #include<stack>
 #include<cmath>
@@ -6,6 +7,8 @@
 #include<fstream>
 #include<sstream>
 #include<algorithm>
+#include<optional>
+#include<iterator>
 /*
 * @param _file_name: file path
 * @purpose: the constructor's purpose is to load the assembly into the source string
@@ -43,7 +46,12 @@ void debug_print(const std::vector<std::string>& command) {
 *
 */
 void lexer::advance() {
-  idx++;
+  if(idx < source.length()) {
+    idx++;
+  }
+  else {
+    std::cerr << "Lexer out of range" << std::endl;
+  }
 }
 /*
 * @purpose: look at the current character
@@ -60,8 +68,23 @@ char lexer::peek() {
 *
 */
 void lexer::ignore() {
-  while(peek() == ' ' || peek() == ',' || peek() == '\t') {
+  while(peek() == ' ' || peek() == ',' || peek() == '\t' || peek() == '\n' || peek() == '\r') {
     advance();
+  }
+}
+std::optional<std::string> lexer::get_section() {
+  if(peek() == '.') {
+      advance();
+      auto start = idx;
+      while(isalpha(peek())) {
+        advance();
+      }
+
+      return source.substr(start, idx-start);
+  }
+  else {
+    std::cerr << "section not found" << std::endl;
+    return {};
   }
 }
 /*
@@ -89,6 +112,7 @@ void lexer::lex_line() {
     command.push_back(val);
   }
   else {
+    std::cout << static_cast<u32>(peek()) << std::endl;
     std::cout << "expression must start with a letter\n";
   }
   if(is_label) {
@@ -157,7 +181,26 @@ void lexer::lex_line() {
 * @purpose: break the instructions into pieces line by line
 */
 void lexer::lex_source() {
-  while(idx < source.length()) {
+  std::vector<std::string> command;
+  auto section = *get_section();
+  if(section == "data") {
+    command.push_back("data");
+    std::stringstream ss;
+    while(peek() != '.') {
+      if(peek() != ' ') {
+        ss << peek();
+      }
+      advance();
+    }
+    command.push_back(ss.str());
+  }
+
+  if(section == "text") {
+    command.push_back("text");
+  }
+  cmds.push_back(command);
+
+  while(idx < source.length() && peek() != '.') {
     try{
       lex_line();
       line_number++;
@@ -235,49 +278,110 @@ tds::u64 lexer::pad_instruction(const u64 instruction) {
 */
 void lexer::gen_code() {
   //std::cout << std::hex << -100 << std::endl;
+  std::vector<u8> text_buffer;
+  std::vector<u8> data_buffer;
+  std::vector<u8> header_buffer;
   auto name = file_name.substr(0,file_name.find(".vm"));
   output_name = name+".bin";
   std::ofstream output_file{output_name, std::ios::binary | std::ios::out};
-  const auto write_u64 = [&output_file](u64 data) {
-    output_file.write((char*)&data, sizeof(data));
+  const auto add_u64 = [&text_buffer](u64 data) {
+    auto cur_qword = data;
+    for(auto i = 0; i < QWORD/BYTE; i++) {
+      text_buffer.push_back(cur_qword & 0xFF);
+      cur_qword = cur_qword >> BYTE;
+    }
   };
+  const auto add_header_entry = [&header_buffer](const std::string& section,const u32 section_offset,
+                                                    const u32 section_length){
+
+    // copy the bytes of the string into the buffer
+    std::copy(section.begin(), section.end(), std::back_inserter(header_buffer));
+    // null byte
+    header_buffer.push_back(0);
+
+    // read the offset into the buffer
+    auto off = section_offset;
+    for(auto i = 0; i < QWORD/BYTE; i++) {
+      header_buffer.push_back(off & 0xFF);
+      off = off >> BYTE;
+    }
+    // read the length into the buffer
+    auto length = section_length;
+    for(auto i = 0; i < QWORD/BYTE; i++) {
+      header_buffer.push_back(length & 0xFF);
+      length = length >> BYTE;
+    }
+    //read the null byte into the buffer
+    header_buffer.push_back(0);
+  };
+  auto text_length = 0;
+  auto text_offset = 0;
+  auto data_length = 0;
+  auto data_offset = 0;
+  std::vector<u8> hex;
   for(const auto& command: cmds) {
+    if(command[0] == "text") {
+      text_offset = text_length;
+    }
+    if(command[0] == "data") {
+      data_offset = data_length;
+      /*
+      for(const auto& ch: command[1]) {
+        if(ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
+          data_buffer.push_back(ch);
+        }
+      }
+      */
+
+    }
     if(op.find(command[0]) != op.end()) {
       u64 op_sec = op[command[0]] << opcode_offset;
       if(command[0] == "add" || command[0] == "sub" || command[0] == "or"
         || command[0] == "sl" || command[0] == "sr" || command[0] == "slt") {
-          write_u64(get_three_reg(op_sec, command));
+          add_u64(get_three_reg(op_sec, command));
       }
       else if(command[0] == "lw" || command[0] == "sw" || command[0] == "ldw"
              || command[0] == "sdw" || command[0] == "lqw" || command[0] == "sqw") {
-        write_u64(get_mem(op_sec, command));
+        add_u64(get_mem(op_sec, command));
       }
       else if(command[0] == "jmp" || command[0] == "jal") {
         u64 addr = strtoull(command[1].substr(1,command[1].length()-1).c_str(), nullptr, 10);
         if(label_line.find(command[1].substr(0,command[1].length())) != label_line.end()) {
           addr = label_line[command[1].substr(0,command[1].length())];
         }
-        write_u64(op_sec | addr);
+        add_u64(op_sec | addr);
       }
       else if(command[0] == "jeq" || command[0] == "jne"
             || command[0] == "ori" || command[0] == "sli"
             || command[0] == "sri" || command[0] == "addi"
             || command[0] == "syscall") {
-        write_u64(get_two_reg_imm(op_sec, command));
+        add_u64(get_two_reg_imm(op_sec, command));
       }
       else if(command[0] == "halt" || command[0] == "jr") {
         u64 reg = strtoull(command[1].c_str(), nullptr, 10);
-        write_u64(op_sec | reg);
+        add_u64(op_sec | reg);
       }
       else if(command[0] == "lui") {
         u64 reg = strtoull(command[1].c_str(), nullptr, 10) << r0_offset;
         u64 imm = strtoull(command[2].substr(1,command[2].length() - 1).c_str(), nullptr, 10) << imm_offset;
-        write_u64(op_sec | reg | imm);
+        add_u64(op_sec | reg | imm);
       }
+      text_length += 64;
+      data_length += 64;
     }
+  }
+  header_buffer.push_back(0x7E);
+  header_buffer.push_back('N');
+  header_buffer.push_back('J');
+  for(auto i = 0; i < 4; i++) {
+    header_buffer.push_back(0);
   }
 
 
+
+  //auto data_size = write_header_entry(".data", data_start + data_offset, data_length, 5);
+  //auto text_size = write_header_entry(".text", pc_start + text_offset,text_length, data_size);
+  //write_header(data_size + text_size);
 }
 std::string lexer::get_output_name() {
   return output_name;

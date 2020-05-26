@@ -3,6 +3,7 @@
 #include"vm-utils.h"
 #include<map>
 #include<vector>
+#include<optional>
 // type defs
 using commands = std::vector<std::vector<std::string>>;
 constexpr auto OPCODE_SIZE = 10;
@@ -38,5 +39,6 @@ private:
     u64 get_two_reg_imm(const u64 op_sec,const std::vector<std::string>& command);
     std::string pad_instruction(const u64 instruction);
     u64 get_mem(const u64 op_sec,const std::vector<std::string>& command);
+    std::optional<std::string> get_section();
 };
 #endif
