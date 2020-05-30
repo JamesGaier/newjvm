@@ -168,7 +168,39 @@ namespace vm {
     void decode() {
         opcode = getOp();
     }
+    // multiply instruction
+    std::pair<u64, u64> mult(u64 lhs, u64 rhs){
 
+        // if(lhs == 0 or rhs == 0) return 0;
+        // else if(lhs == 1 or rhs == 1) return std::max(lhs, rhs);
+
+        constexpr u64 sign_mask = 1ul << 63;
+        auto lhs_sign = lhs & sign_mask;
+        auto rhs_sign = rhs & sign_mask;
+
+        auto overflow = 0;
+        u64 result = 0;
+        for(auto i = 0u; i < sizeof(lhs) * 8 - 1 and lhs != 0 and rhs != 0; ++i){
+
+            overflow <<= 1;
+
+            if(rhs & 1){
+                result += lhs;
+                overflow |= (lhs & sign_mask) >> 63;
+            }
+
+            lhs <<= 1;
+            rhs >>= 1;
+        }
+
+        // Set sign of result
+        if(lhs_sign ^ rhs_sign){
+            result |= sign_mask;
+        }else{
+            result &= ~sign_mask;
+        }
+        return std::make_pair(result, overflow);
+    }
 
     /*
     * @purpose: To do arithemetic and bitwise instructions
@@ -216,6 +248,13 @@ namespace vm {
                     const auto top_half = (reg_imm.imm & 0x80000000) ? 0xFFFFFFFFul : 0;
                     registers[reg_imm.r0] = registers[reg_imm.r1] + (top_half << 32u | reg_imm.imm);
 
+                }
+                break;
+            case 13:
+                auto product = mult(registers[regs.r1], registers[regs.r2]);
+                registers[regs.r0] = product.first;
+                if(product.second > 0) {
+                    registers[60] = product.second;
                 }
                 break;
 
@@ -281,13 +320,13 @@ namespace vm {
     * @purpose: To execute instructions based on the opcode
     */
     void execute() {
-        if(opcode > 0 && opcode <= 12) {
+        if(opcode > 0 && opcode <= 13) {
             ab_instr();
         }
         else if(opcode >= 100 && opcode <= 104) {
             br_instr();
         }
-        else if(opcode >= 200 && opcode <= 205) {
+        else if(opcode >= 200 && opcode <= 207) {
             mem_instr();
         }
         else if(opcode == 0) {
@@ -325,8 +364,6 @@ namespace vm {
     }
     void load_program(const std::string& file_name) {
         auto prog = read_source(file_name);
-        auto page_index = pc/page_size_bytes;
-        auto index = pc % page_size_bytes;
 
         memory.emplace(0, page());
 
@@ -382,7 +419,7 @@ namespace vm {
                     }
                 }
                 u64 dest = mem_start;
-                for(auto i = 0; i < length; i++) {
+                for(auto i = 0u; i < length; i++) {
                     memory[dest/page_size_bytes][dest%page_size_bytes] = prog[i+offset];
                     dest++;
                 }
